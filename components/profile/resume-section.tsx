@@ -244,7 +244,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
               }
               const res = await fetch(resumeUrl, { method: "HEAD" });
               if (res.ok) {
-                window.open(resumeUrl, "_blank", "noopener,noreferrer");
+                window.open(resumeUrl, "_self", "noopener,noreferrer");
               } else {
                 toast({
                   title: "Resume not found",
