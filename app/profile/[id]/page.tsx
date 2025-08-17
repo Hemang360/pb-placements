@@ -35,6 +35,11 @@ interface ProfilePageProps {
   }>;
 }
 
+function formatResumeDisplayName(fullName: string, year: number): string {
+  const name = fullName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+  return `${name}_${year}yr_resume.pdf`;
+}
+
 export async function generateMetadata({ params }: ProfilePageProps): Promise<Metadata> {
   const { id } = await params;
   const supabase = createServerComponentClient({ cookies });
@@ -111,6 +116,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const projects = await ProjectService.getMemberProjects(supabase, actualMemberId);
   
   const isCurrentUser = user?.id === member.id;
+  const displayFileName = formatResumeDisplayName(member.name, member.year_of_study);
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black relative overflow-hidden">
@@ -332,6 +338,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                   <ResumeSection 
                     resumeUrl={member.resume_url} 
                     isEditable={isCurrentUser}
+                    displayFileName={displayFileName}
                   />
                 </div>
               </div>
