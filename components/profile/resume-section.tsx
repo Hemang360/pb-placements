@@ -41,6 +41,7 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [iframeSrc, setIframeSrc] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleViewResume = async () => {
@@ -52,6 +53,20 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
       if (!res.ok) {
         throw new Error('Resume not accessible');
       }
+      // Determine best viewer URL depending on device/support
+      const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const hasPdfMime = typeof navigator !== 'undefined' && (navigator as any).mimeTypes && (navigator as any).mimeTypes['application/pdf'];
+      const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
+
+      let src = `${resumeUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
+
+      if (isIOS || !hasPdfMime || isSmallScreen) {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const absoluteUrl = resumeUrl.startsWith('http') ? resumeUrl : `${origin}${resumeUrl}`;
+        src = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(absoluteUrl)}`;
+      }
+
+      setIframeSrc(src);
       setIsOpen(true);
     } catch (error) {
       setError(true);
@@ -118,7 +133,7 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
               </div>
             ) : (
               <iframe
-                src={`${resumeUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                src={iframeSrc || `${resumeUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
                 className="w-full h-full border-0 block"
                 title={displayName}
                 style={{ margin: 0, padding: 0 }}
@@ -136,6 +151,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
   const [resumeFiles, setResumeFiles] = useState<ResumeFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [effectiveUserId, setEffectiveUserId] = useState<string | undefined>(userId);
   const supabase = createClientComponentClient();
   const { toast } = useToast();
 
@@ -146,6 +162,24 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
       setLoading(false);
     }
   }, [isEditable]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function resolveUserId() {
+      if (userId) {
+        setEffectiveUserId(userId);
+        return;
+      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (mounted) setEffectiveUserId(user?.id);
+      } catch {
+        if (mounted) setEffectiveUserId(undefined);
+      }
+    }
+    resolveUserId();
+    return () => { mounted = false; };
+  }, [userId, supabase]);
 
   const fetchResumeFiles = async () => {
     try {
@@ -317,6 +351,8 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
   };
 
   if (!isEditable && resumeUrl) {
+    // Build proxy URL using member/user id if available
+    const proxyUrl = effectiveUserId ? `/api/resume/view/${effectiveUserId}` : resumeUrl;
     return (
       <div className="p-6">
         <h2 className="text-2xl font-semibold mb-6">Resume</h2>
@@ -329,7 +365,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
             </p>
           </div>
           <ResumeModal 
-            resumeUrl={resumeUrl} 
+            resumeUrl={proxyUrl} 
             fileName="Resume.pdf"
             displayName={displayFileName || 'Resume.pdf'}
           />
@@ -414,13 +450,13 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
 
                     <div className="flex items-center gap-2">
                       <ResumeModal 
-                        resumeUrl={file.publicUrl} 
+                        resumeUrl={effectiveUserId ? `/api/resume/view/${effectiveUserId}` : file.publicUrl}
                         fileName={file.name}
                         displayName={displayFileName || file.name}
                       />
                       
                       <Button variant="ghost" size="sm" asChild>
-                        <a href={file.publicUrl} download={displayFileName || file.name}>
+                        <a href={effectiveUserId ? `/api/resume/view/${effectiveUserId}` : file.publicUrl} download={displayFileName || file.name}>
                           <Download className="h-4 w-4" />
                         </a>
                       </Button>
