@@ -65,21 +65,23 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
         throw new Error('Resume not accessible');
       }
 
-      // For mobile, just validate access and open modal
+      // For mobile, directly open in new tab
       if (isMobile) {
-        setIsOpen(true);
-      } else {
-        // For desktop, fetch PDF as blob for iframe viewing
-        const pdfResponse = await fetch(resumeUrl);
-        if (!pdfResponse.ok) {
-          throw new Error('Failed to load resume');
-        }
-        const pdfBlob = await pdfResponse.blob();
-        const url = URL.createObjectURL(pdfBlob);
-        setBlobUrl(url);
-        setIframeSrc(url);
-        setIsOpen(true);
+        window.open(resumeUrl, '_blank');
+        setIsLoading(false);
+        return;
       }
+
+      // For desktop, fetch PDF as blob for iframe viewing
+      const pdfResponse = await fetch(resumeUrl);
+      if (!pdfResponse.ok) {
+        throw new Error('Failed to load resume');
+      }
+      const pdfBlob = await pdfResponse.blob();
+      const url = URL.createObjectURL(pdfBlob);
+      setBlobUrl(url);
+      setIframeSrc(url);
+      setIsOpen(true);
     } catch (error) {
       setError(true);
       toast({
