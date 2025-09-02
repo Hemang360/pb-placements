@@ -320,13 +320,15 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const d = new Date(dateString);
+    // Stable, timezone-independent: YYYY-MM-DD HH:MM (UTC)
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const y = d.getUTCFullYear();
+    const m = pad(d.getUTCMonth() + 1);
+    const day = pad(d.getUTCDate());
+    const hh = pad(d.getUTCHours());
+    const mm = pad(d.getUTCMinutes());
+    return `${y}-${m}-${day} ${hh}:${mm} UTC`;
   };
 
   const getVersionNumber = (index: number) => {
@@ -344,7 +346,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{displayFileName || 'Resume.pdf'}</p>
             <p className="text-xs text-muted-foreground truncate">
-              Last updated: {new Date().toLocaleDateString()}
+              Last updated: {new Date().toISOString().slice(0, 10)}
             </p>
           </div>
           <ResumeModal 
