@@ -151,7 +151,6 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
   const [resumeFiles, setResumeFiles] = useState<ResumeFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [effectiveUserId, setEffectiveUserId] = useState<string | undefined>(userId);
   const supabase = createClientComponentClient();
   const { toast } = useToast();
 
@@ -163,23 +162,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
     }
   }, [isEditable]);
 
-  useEffect(() => {
-    let mounted = true;
-    async function resolveUserId() {
-      if (userId) {
-        setEffectiveUserId(userId);
-        return;
-      }
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (mounted) setEffectiveUserId(user?.id);
-      } catch {
-        if (mounted) setEffectiveUserId(undefined);
-      }
-    }
-    resolveUserId();
-    return () => { mounted = false; };
-  }, [userId, supabase]);
+  // No auth required for viewing. We only use userId if provided.
 
   const fetchResumeFiles = async () => {
     try {
@@ -352,7 +335,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
 
   if (!isEditable && resumeUrl) {
     // Build proxy URL using member/user id if available
-    const proxyUrl = effectiveUserId ? `/api/resume/view/${effectiveUserId}` : resumeUrl;
+    const proxyUrl = userId ? `/api/resume/view/${userId}` : resumeUrl;
     return (
       <div className="p-6">
         <h2 className="text-2xl font-semibold mb-6">Resume</h2>
@@ -450,13 +433,13 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
 
                     <div className="flex items-center gap-2">
                       <ResumeModal 
-                        resumeUrl={effectiveUserId ? `/api/resume/view/${effectiveUserId}` : file.publicUrl}
+                        resumeUrl={userId ? `/api/resume/view/${userId}` : file.publicUrl}
                         fileName={file.name}
                         displayName={displayFileName || file.name}
                       />
                       
                       <Button variant="ghost" size="sm" asChild>
-                        <a href={effectiveUserId ? `/api/resume/view/${effectiveUserId}` : file.publicUrl} download={displayFileName || file.name}>
+                        <a href={userId ? `/api/resume/view/${userId}` : file.publicUrl} download={displayFileName || file.name}>
                           <Download className="h-4 w-4" />
                         </a>
                       </Button>
