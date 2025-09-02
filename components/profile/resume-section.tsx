@@ -42,6 +42,7 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleViewResume = async () => {
@@ -53,20 +54,16 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
       if (!res.ok) {
         throw new Error('Resume not accessible');
       }
-      // Determine best viewer URL depending on device/support
-      const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const hasPdfMime = typeof navigator !== 'undefined' && (navigator as any).mimeTypes && (navigator as any).mimeTypes['application/pdf'];
-      const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
 
-      let src = `${resumeUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
-
-      if (isIOS || !hasPdfMime || isSmallScreen) {
-        const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        const absoluteUrl = resumeUrl.startsWith('http') ? resumeUrl : `${origin}${resumeUrl}`;
-        src = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(absoluteUrl)}`;
+      // Fetch PDF as blob to avoid cross-origin viewer issues on some mobile browsers
+      const pdfResponse = await fetch(resumeUrl);
+      if (!pdfResponse.ok) {
+        throw new Error('Failed to load resume');
       }
-
-      setIframeSrc(src);
+      const pdfBlob = await pdfResponse.blob();
+      const url = URL.createObjectURL(pdfBlob);
+      setBlobUrl(url);
+      setIframeSrc(url);
       setIsOpen(true);
     } catch (error) {
       setError(true);
@@ -80,6 +77,14 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [blobUrl]);
 
   return (
     <>
