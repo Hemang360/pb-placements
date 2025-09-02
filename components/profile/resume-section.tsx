@@ -43,7 +43,17 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
   const [error, setError] = useState(false);
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleViewResume = async () => {
     setIsLoading(true);
@@ -55,16 +65,21 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
         throw new Error('Resume not accessible');
       }
 
-      // Fetch PDF as blob to avoid cross-origin viewer issues on some mobile browsers
-      const pdfResponse = await fetch(resumeUrl);
-      if (!pdfResponse.ok) {
-        throw new Error('Failed to load resume');
+      // For mobile, just validate access and open modal
+      if (isMobile) {
+        setIsOpen(true);
+      } else {
+        // For desktop, fetch PDF as blob for iframe viewing
+        const pdfResponse = await fetch(resumeUrl);
+        if (!pdfResponse.ok) {
+          throw new Error('Failed to load resume');
+        }
+        const pdfBlob = await pdfResponse.blob();
+        const url = URL.createObjectURL(pdfBlob);
+        setBlobUrl(url);
+        setIframeSrc(url);
+        setIsOpen(true);
       }
-      const pdfBlob = await pdfResponse.blob();
-      const url = URL.createObjectURL(pdfBlob);
-      setBlobUrl(url);
-      setIframeSrc(url);
-      setIsOpen(true);
     } catch (error) {
       setError(true);
       toast({
@@ -136,9 +151,25 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
                   </p>
                 </div>
               </div>
+            ) : isMobile ? (
+              <div className="flex items-center justify-center h-full bg-background">
+                <div className="text-center space-y-4">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto" />
+                  <p className="text-lg font-medium">Resume Ready to View</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Click the button below to open the resume in your browser
+                  </p>
+                  <Button
+                    onClick={() => window.open(resumeUrl, '_blank')}
+                    className="bg-green-500 hover:bg-green-600"
+                  >
+                    Open Resume
+                  </Button>
+                </div>
+              </div>
             ) : (
               <iframe
-                src={iframeSrc || `${resumeUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                src={iframeSrc || `${resumeUrl}#toolbar=0&navpanes=0&view=FitH`}
                 className="w-full h-full border-0 block"
                 title={displayName}
                 style={{ margin: 0, padding: 0 }}
