@@ -43,13 +43,25 @@ export async function GET(_req: NextRequest, { params }: { params: { memberId: s
       return NextResponse.json({ message: 'Failed to load resume' }, { status: 502 });
     }
 
-    const filenameSafeName = (member.name || 'resume')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-');
+    // Extract filename from the original resume URL
+    let filename = 'resume.pdf';
+    try {
+      const url = new URL(resumeUrl);
+      const pathParts = url.pathname.split('/');
+      const lastPart = pathParts[pathParts.length - 1];
+      if (lastPart && lastPart.includes('.pdf')) {
+        filename = lastPart;
+      } else {
+        // Fallback to member name if no filename in URL
+        filename = `${member.name || 'resume'}.pdf`;
+      }
+    } catch {
+      filename = `${member.name || 'resume'}.pdf`;
+    }
 
     const headers = new Headers();
     headers.set('Content-Type', 'application/pdf');
-    headers.set('Content-Disposition', `inline; filename="${filenameSafeName}.pdf"`);
+    headers.set('Content-Disposition', `inline; filename="${filename}"`);
     headers.set('Cache-Control', 'private, max-age=60');
 
     return new NextResponse(upstream.body, { status: 200, headers });

@@ -41,8 +41,6 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [iframeSrc, setIframeSrc] = useState<string | null>(null);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
 
@@ -72,15 +70,7 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
         return;
       }
 
-      // For desktop, fetch PDF as blob for iframe viewing
-      const pdfResponse = await fetch(resumeUrl);
-      if (!pdfResponse.ok) {
-        throw new Error('Failed to load resume');
-      }
-      const pdfBlob = await pdfResponse.blob();
-      const url = URL.createObjectURL(pdfBlob);
-      setBlobUrl(url);
-      setIframeSrc(url);
+      // For desktop, open modal with iframe
       setIsOpen(true);
     } catch (error) {
       setError(true);
@@ -94,14 +84,6 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    };
-  }, [blobUrl]);
 
   return (
     <>
@@ -153,25 +135,9 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
                   </p>
                 </div>
               </div>
-            ) : isMobile ? (
-              <div className="flex items-center justify-center h-full bg-background">
-                <div className="text-center space-y-4">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto" />
-                  <p className="text-lg font-medium">Resume Ready to View</p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Click the button below to open the resume in your browser
-                  </p>
-                  <Button
-                    onClick={() => window.open(resumeUrl, '_blank')}
-                    className="bg-green-500 hover:bg-green-600"
-                  >
-                    Open Resume
-                  </Button>
-                </div>
-              </div>
             ) : (
               <iframe
-                src={iframeSrc || `${resumeUrl}#toolbar=0&navpanes=0&view=FitH`}
+                src={`${resumeUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
                 className="w-full h-full border-0 block"
                 title={displayName}
                 style={{ margin: 0, padding: 0 }}
