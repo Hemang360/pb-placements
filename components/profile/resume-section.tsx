@@ -65,7 +65,20 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
 
       // For mobile, directly open in new tab
       if (isMobile) {
-        window.open(resumeUrl, '_blank');
+        // iOS Safari blocks popups, so use a different approach
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+          // For iOS, create a temporary link and click it
+          const link = document.createElement('a');
+          link.href = resumeUrl;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          // For other mobile devices, try window.open
+          window.open(resumeUrl, '_blank');
+        }
         setIsLoading(false);
         return;
       }
