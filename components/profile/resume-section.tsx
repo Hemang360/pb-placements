@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { FileText, Upload, Trash2, Download, Plus, Calendar, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -48,7 +48,7 @@ function ResumeModal({ resumeUrl, displayName }: {
       setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile, { passive: true });
+    window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -62,30 +62,45 @@ function ResumeModal({ resumeUrl, displayName }: {
         throw new Error('Resume not accessible');
       }
 
-             // For mobile, directly open in new tab
-       if (isMobile) {
-         const absoluteUrl = resumeUrl.startsWith('http')
-           ? resumeUrl
-           : `${window.location.origin}${resumeUrl}`;
+      // For mobile, directly open in new tab
+      if (isMobile) {
+        // Ensure absolute URL (required on some mobile browsers)
+        const absoluteUrl = resumeUrl.startsWith('http')
+          ? resumeUrl
+          : `${window.location.origin}${resumeUrl}`;
 
-         const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
-         if (isIOS) {
-           const link = document.createElement('a');
-           link.href = absoluteUrl;
-           link.target = '_blank';
-           link.rel = 'noopener noreferrer';
-           document.body.appendChild(link);
-           link.click();
-           document.body.removeChild(link);
-         } else {
-           const opened = window.open(absoluteUrl, '_blank');
-           if (!opened) {
-             window.location.href = absoluteUrl;
-           }
-         }
-         setIsLoading(false);
-         return;
-       }
+        // iOS Safari blocks popups, so prefer an <a> click; fallback to same-tab navigation
+        const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
+        if (isIOS) {
+          try {
+            const link = document.createElement('a');
+            link.href = absoluteUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // If new tab is blocked, navigate in the same tab
+            setTimeout(() => {
+              // Heuristic: if still on the same page shortly after, force same-tab navigation
+              if (document.visibilityState === 'visible') {
+                window.location.href = absoluteUrl;
+              }
+            }, 100);
+          } catch {
+            window.location.href = absoluteUrl;
+          }
+        } else {
+          // Other mobile devices: try window.open; fallback to same-tab
+          const opened = window.open(absoluteUrl, '_blank');
+          if (!opened) {
+            window.location.href = absoluteUrl;
+          }
+        }
+        setIsLoading(false);
+        return;
+      }
 
       // For desktop, open modal with iframe
       setIsOpen(true);
@@ -122,22 +137,22 @@ function ResumeModal({ resumeUrl, displayName }: {
                 <FileText className="h-4 w-4 flex-shrink-0" />
                 <span className="truncate">{displayName}</span>
               </DialogTitle>
-                             <Button
-                 variant="outline"
-                 size="sm"
-                 className="h-8 ml-4"
-                 onClick={async () => {
-                   const response = await fetch(resumeUrl);
-                   const blob = await response.blob();
-                   const link = document.createElement("a");
-                   link.href = URL.createObjectURL(blob);
-                   link.download = displayName;
-                   link.click();
-                 }}
-               >
-                 <Download className="h-3 w-3 mr-1" />
-                 Download
-               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 ml-4"
+                onClick={async () => {
+                  const blob = await (await fetch(resumeUrl)).blob();
+                  const link = Object.assign(document.createElement("a"), {
+                    href: URL.createObjectURL(blob),
+                    download: displayName,
+                  });
+                  link.click();
+                }}
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Download
+              </Button>
             </div>
           </DialogHeader>
           
@@ -184,57 +199,57 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
   }, [isEditable]);
 
 
-     const fetchResumeFiles = async () => {
-     try {
-       const id = userId || (await supabase.auth.getUser()).data?.user?.id;
-       if (!id) return;
+  const fetchResumeFiles = async () => {
+    try {
+      const id = userId || (await supabase.auth.getUser()).data?.user?.id;
+      if (!id) return;
 
-       const userFolder = `resumes/${id}`;
-       const { data: files, error } = await supabase.storage
-         .from('resume')
-         .list(userFolder);
+      const userFolder = `resumes/${id}`;
+      const { data: files, error } = await supabase.storage
+        .from('resume')
+        .list(userFolder);
 
-       if (error) {
-         console.error('Error fetching files:', error);
-         return;
-       }
+      if (error) {
+        console.error('Error fetching files:', error);
+        return;
+      }
 
-       if (files) {
-         const filesWithUrls = await Promise.all(
-           files.map(async (file) => {
-             const { data: { publicUrl } } = supabase.storage
-               .from('resume')
-               .getPublicUrl(`${userFolder}/${file.name}`);
-             
-             return {
-               name: file.name,
-               created_at: file.created_at,
-               size: file.metadata?.size || 0,
-               publicUrl
-             };
-           })
-         );
+      if (files) {
+        const filesWithUrls = await Promise.all(
+          files.map(async (file) => {
+            const { data: { publicUrl } } = supabase.storage
+              .from('resume')
+              .getPublicUrl(`${userFolder}/${file.name}`);
+            
+            return {
+              name: file.name,
+              created_at: file.created_at,
+              size: file.metadata?.size || 0,
+              publicUrl
+            };
+          })
+        );
 
-         filesWithUrls.sort((a, b) =>
-           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-         );
+      filesWithUrls.sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
 
-         setResumeFiles(filesWithUrls);
+      setResumeFiles(filesWithUrls);
 
-         const latestResume = filesWithUrls[0];
-         if (latestResume) {
-           await supabase
-             .from('members')
-             .update({ resume_url: latestResume.publicUrl })
-             .eq('id', id);
-         }
-       }
-     } catch (error) {
-       console.error('Error fetching resume files:', error);
-     } finally {
-       setLoading(false);
-     }
-   };
+      const latestResume = filesWithUrls[0];
+      if (latestResume) {
+        await supabase
+          .from('members')
+          .update({ resume_url: latestResume.publicUrl })
+          .eq('id', id);
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching resume files:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -339,16 +354,17 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-     const formatDate = (dateString: string) => {
-     const d = new Date(dateString);
-     const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-     const y = d.getUTCFullYear();
-     const m = pad(d.getUTCMonth() + 1);
-     const day = pad(d.getUTCDate());
-     const hh = pad(d.getUTCHours());
-     const mm = pad(d.getUTCMinutes());
-     return `${y}-${m}-${day} ${hh}:${mm} UTC`;
-   };
+  const formatDate = (dateString: string) => {
+    const d = new Date(dateString);
+    // Stable, timezone-independent: YYYY-MM-DD HH:MM (UTC)
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const y = d.getUTCFullYear();
+    const m = pad(d.getUTCMonth() + 1);
+    const day = pad(d.getUTCDate());
+    const hh = pad(d.getUTCHours());
+    const mm = pad(d.getUTCMinutes());
+    return `${y}-${m}-${day} ${hh}:${mm} UTC`;
+  };
 
   const getVersionNumber = (index: number) => {
     return `v${resumeFiles.length - index}`;
