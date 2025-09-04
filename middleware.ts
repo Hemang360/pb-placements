@@ -3,6 +3,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(req: NextRequest) {
+  const pathname = req.nextUrl.pathname;
+
+  // Allow public access to resume view proxy without auth
+  if (pathname.startsWith('/api/resume/view')) {
+    return NextResponse.next();
+  }
+
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
 
@@ -19,13 +26,6 @@ export async function middleware(req: NextRequest) {
     '/api/links',
     '/api/member-skills',
   ];
-
-  const pathname = req.nextUrl.pathname;
-
-  // Allow public access to resume view proxy without auth
-  if (pathname.startsWith('/api/resume/view')) {
-    return res;
-  }
 
   const isProtected = protectedRoutes.some((route) =>
     pathname.startsWith(route)

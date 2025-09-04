@@ -2,29 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MemberService } from '@/lib/db';
 import { createClient } from '@supabase/supabase-js';
 
-async function getMemberAndUrl(memberId: string) {
+async function getMemberAndResumeUrl(memberId: string) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
   const member = await MemberService.getMemberById(supabase, memberId);
-  const resumeUrl = member?.resume_url;
-  return { member, resumeUrl };
+  return { member, resumeUrl: member?.resume_url };
 }
 
-export async function HEAD(_req: NextRequest, { params }: { params: { memberId: string } }) {
-  try {
-    const { memberId } = params;
-    if (!memberId) return new NextResponse(null, { status: 400 });
-
-    const { resumeUrl } = await getMemberAndUrl(memberId);
-    if (!resumeUrl) return new NextResponse(null, { status: 404 });
-
-    return new NextResponse(null, { status: 200 });
-  } catch (error) {
-    return new NextResponse(null, { status: 500 });
-  }
-}
 
 export async function GET(_req: NextRequest, { params }: { params: { memberId: string } }) {
   try {
@@ -33,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: { memberId: s
       return NextResponse.json({ message: 'memberId is required' }, { status: 400 });
     }
 
-    const { member, resumeUrl } = await getMemberAndUrl(memberId);
+    const { member, resumeUrl } = await getMemberAndResumeUrl(memberId);
     if (!member || !resumeUrl) {
       return NextResponse.json({ message: 'Resume not found' }, { status: 404 });
     }
@@ -52,7 +38,6 @@ export async function GET(_req: NextRequest, { params }: { params: { memberId: s
       if (lastPart && lastPart.includes('.pdf')) {
         filename = lastPart;
       } else {
-        // Fallback to member name if no filename in URL
         filename = `${member.name || 'resume'}.pdf`;
       }
     } catch {
