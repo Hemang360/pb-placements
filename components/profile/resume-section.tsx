@@ -45,7 +45,7 @@ function ResumeModal({ resumeUrl, displayName }: {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|/i.test(navigator.userAgent));
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -62,14 +62,11 @@ function ResumeModal({ resumeUrl, displayName }: {
         throw new Error('Resume not accessible');
       }
 
-      // For mobile, directly open in new tab
       if (isMobile) {
-        // Ensure absolute URL (required on some mobile browsers)
         const absoluteUrl = resumeUrl.startsWith('http')
           ? resumeUrl
           : `${window.location.origin}${resumeUrl}`;
 
-        // iOS Safari blocks popups, so prefer an <a> click; fallback to same-tab navigation
         const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
         if (isIOS) {
           try {
@@ -81,9 +78,7 @@ function ResumeModal({ resumeUrl, displayName }: {
             link.click();
             document.body.removeChild(link);
 
-            // If new tab is blocked, navigate in the same tab
             setTimeout(() => {
-              // Heuristic: if still on the same page shortly after, force same-tab navigation
               if (document.visibilityState === 'visible') {
                 window.location.href = absoluteUrl;
               }
@@ -92,7 +87,6 @@ function ResumeModal({ resumeUrl, displayName }: {
             window.location.href = absoluteUrl;
           }
         } else {
-          // Other mobile devices: try window.open; fallback to same-tab
           const opened = window.open(absoluteUrl, '_blank');
           if (!opened) {
             window.location.href = absoluteUrl;
@@ -102,7 +96,6 @@ function ResumeModal({ resumeUrl, displayName }: {
         return;
       }
 
-      // For desktop, open modal with iframe
       setIsOpen(true);
     } catch (error) {
       setError(true);
