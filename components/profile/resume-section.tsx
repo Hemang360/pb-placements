@@ -33,8 +33,9 @@ interface ResumeSectionProps {
   userId?: string;
   displayFileName?: string;
 }
-function ResumeModal({ resumeUrl, displayName }: { 
+function ResumeModal({ resumeUrl, fileName, displayName }: { 
   resumeUrl: string; 
+  fileName: string;
   displayName: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +46,7 @@ function ResumeModal({ resumeUrl, displayName }: {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|/i.test(navigator.userAgent));
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -62,14 +63,11 @@ function ResumeModal({ resumeUrl, displayName }: {
         throw new Error('Resume not accessible');
       }
 
-      // For mobile, directly open in new tab
       if (isMobile) {
-        // Ensure absolute URL (required on some mobile browsers)
         const absoluteUrl = resumeUrl.startsWith('http')
           ? resumeUrl
           : `${window.location.origin}${resumeUrl}`;
 
-        // iOS Safari blocks popups, so prefer an <a> click; fallback to same-tab navigation
         const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
         if (isIOS) {
           try {
@@ -81,9 +79,7 @@ function ResumeModal({ resumeUrl, displayName }: {
             link.click();
             document.body.removeChild(link);
 
-            // If new tab is blocked, navigate in the same tab
             setTimeout(() => {
-              // Heuristic: if still on the same page shortly after, force same-tab navigation
               if (document.visibilityState === 'visible') {
                 window.location.href = absoluteUrl;
               }
@@ -92,7 +88,6 @@ function ResumeModal({ resumeUrl, displayName }: {
             window.location.href = absoluteUrl;
           }
         } else {
-          // Other mobile devices: try window.open; fallback to same-tab
           const opened = window.open(absoluteUrl, '_blank');
           if (!opened) {
             window.location.href = absoluteUrl;
@@ -102,7 +97,6 @@ function ResumeModal({ resumeUrl, displayName }: {
         return;
       }
 
-      // For desktop, open modal with iframe
       setIsOpen(true);
     } catch (error) {
       setError(true);
@@ -197,6 +191,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
       setLoading(false);
     }
   }, [isEditable]);
+
 
   const fetchResumeFiles = async () => {
     try {
@@ -385,6 +380,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
           </div>
           <ResumeModal 
             resumeUrl={proxyUrl} 
+            fileName="Resume.pdf"
             displayName={displayFileName || 'Resume.pdf'}
           />
         </div>
@@ -469,6 +465,7 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
                     <div className="flex items-center gap-2">
                       <ResumeModal 
                         resumeUrl={userId ? `/api/resume/view/${userId}` : file.publicUrl}
+                        fileName={file.name}
                         displayName={displayFileName || file.name}
                       />
                       

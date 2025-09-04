@@ -70,3 +70,5 @@ export async function GET(_req: NextRequest, { params }: { params: { memberId: s
     return NextResponse.json({ message: 'Server error' }, { status: 500 });
   }
 }
+
+
