@@ -65,19 +65,39 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
 
       // For mobile, directly open in new tab
       if (isMobile) {
-        // iOS Safari blocks popups, so use a different approach
-        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-          // For iOS, create a temporary link and click it
-          const link = document.createElement('a');
-          link.href = resumeUrl;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+        // Ensure absolute URL (required on some mobile browsers)
+        const absoluteUrl = resumeUrl.startsWith('http')
+          ? resumeUrl
+          : `${window.location.origin}${resumeUrl}`;
+
+        // iOS Safari blocks popups, so prefer an <a> click; fallback to same-tab navigation
+        const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
+        if (isIOS) {
+          try {
+            const link = document.createElement('a');
+            link.href = absoluteUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // If new tab is blocked, navigate in the same tab
+            setTimeout(() => {
+              // Heuristic: if still on the same page shortly after, force same-tab navigation
+              if (document.visibilityState === 'visible') {
+                window.location.href = absoluteUrl;
+              }
+            }, 100);
+          } catch {
+            window.location.href = absoluteUrl;
+          }
         } else {
-          // For other mobile devices, try window.open
-          window.open(resumeUrl, '_blank');
+          // Other mobile devices: try window.open; fallback to same-tab
+          const opened = window.open(absoluteUrl, '_blank');
+          if (!opened) {
+            window.location.href = absoluteUrl;
+          }
         }
         setIsLoading(false);
         return;
