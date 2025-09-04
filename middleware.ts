@@ -22,6 +22,11 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
+  // Allow public access to resume view proxy without auth
+  if (pathname.startsWith('/api/resume/view')) {
+    return res;
+  }
+
   const isProtected = protectedRoutes.some((route) =>
     pathname.startsWith(route)
   );

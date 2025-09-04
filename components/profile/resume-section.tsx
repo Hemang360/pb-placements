@@ -33,15 +33,24 @@ interface ResumeSectionProps {
   userId?: string;
   displayFileName?: string;
 }
-function ResumeModal({ resumeUrl, fileName, displayName }: { 
+function ResumeModal({ resumeUrl, displayName }: { 
   resumeUrl: string; 
-  fileName: string;
   displayName: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleViewResume = async () => {
     setIsLoading(true);
@@ -52,6 +61,48 @@ function ResumeModal({ resumeUrl, fileName, displayName }: {
       if (!res.ok) {
         throw new Error('Resume not accessible');
       }
+
+      // For mobile, directly open in new tab
+      if (isMobile) {
+        // Ensure absolute URL (required on some mobile browsers)
+        const absoluteUrl = resumeUrl.startsWith('http')
+          ? resumeUrl
+          : `${window.location.origin}${resumeUrl}`;
+
+        // iOS Safari blocks popups, so prefer an <a> click; fallback to same-tab navigation
+        const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
+        if (isIOS) {
+          try {
+            const link = document.createElement('a');
+            link.href = absoluteUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // If new tab is blocked, navigate in the same tab
+            setTimeout(() => {
+              // Heuristic: if still on the same page shortly after, force same-tab navigation
+              if (document.visibilityState === 'visible') {
+                window.location.href = absoluteUrl;
+              }
+            }, 100);
+          } catch {
+            window.location.href = absoluteUrl;
+          }
+        } else {
+          // Other mobile devices: try window.open; fallback to same-tab
+          const opened = window.open(absoluteUrl, '_blank');
+          if (!opened) {
+            window.location.href = absoluteUrl;
+          }
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // For desktop, open modal with iframe
       setIsOpen(true);
     } catch (error) {
       setError(true);
@@ -303,13 +354,15 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const d = new Date(dateString);
+    // Stable, timezone-independent: YYYY-MM-DD HH:MM (UTC)
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const y = d.getUTCFullYear();
+    const m = pad(d.getUTCMonth() + 1);
+    const day = pad(d.getUTCDate());
+    const hh = pad(d.getUTCHours());
+    const mm = pad(d.getUTCMinutes());
+    return `${y}-${m}-${day} ${hh}:${mm} UTC`;
   };
 
   const getVersionNumber = (index: number) => {
@@ -317,6 +370,8 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
   };
 
   if (!isEditable && resumeUrl) {
+    // Build proxy URL using member/user id if available
+    const proxyUrl = userId ? `/api/resume/view/${userId}` : resumeUrl;
     return (
       <div className="p-6">
         <h2 className="text-2xl font-semibold mb-6">Resume</h2>
@@ -325,12 +380,11 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{displayFileName || 'Resume.pdf'}</p>
             <p className="text-xs text-muted-foreground truncate">
-              Last updated: {new Date().toLocaleDateString()}
+              Last updated: {new Date().toISOString().slice(0, 10)}
             </p>
           </div>
           <ResumeModal 
-            resumeUrl={resumeUrl} 
-            fileName="Resume.pdf"
+            resumeUrl={proxyUrl} 
             displayName={displayFileName || 'Resume.pdf'}
           />
         </div>
@@ -414,13 +468,12 @@ export function ResumeSection({ resumeUrl, isEditable, userId, displayFileName }
 
                     <div className="flex items-center gap-2">
                       <ResumeModal 
-                        resumeUrl={file.publicUrl} 
-                        fileName={file.name}
+                        resumeUrl={userId ? `/api/resume/view/${userId}` : file.publicUrl}
                         displayName={displayFileName || file.name}
                       />
                       
                       <Button variant="ghost" size="sm" asChild>
-                        <a href={file.publicUrl} download={displayFileName || file.name}>
+                        <a href={userId ? `/api/resume/view/${userId}` : file.publicUrl} download={displayFileName || file.name}>
                           <Download className="h-4 w-4" />
                         </a>
                       </Button>
